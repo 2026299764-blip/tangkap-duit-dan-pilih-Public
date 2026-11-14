@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tangkap duit! Dompet lawan PayLater</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#cfeeff;--sf:#fff;--ink:#2b2350;--mute:#6a6490;--pink:#ff5c93;--grn:#1fa965;--pur:#6f4cff;--okbg:#dcf7e8;--badbg:#ffe0ea;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1840;--sf:#2a2560;--ink:#f4f1ff;--mute:#b7b0e6;--grn:#4fdc92;--okbg:#17503a;--badbg:#5a2442;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1b1840;--sf:#2a2560;--ink:#f4f1ff;--mute:#b7b0e6;--grn:#4fdc92;--okbg:#17503a;--badbg:#5a2442;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 Fredoka,"Comic Sans MS","Trebuchet MS",system-ui,sans-serif}
+main{max-width:440px;margin:0 auto;padding:14px}
+h1{font-size:2.1rem;line-height:1.05;margin:6px 0;color:var(--pink);text-shadow:2px 2px 0 var(--ink)}
+h2{font-size:1.2rem;margin:16px 0 6px}
+p{margin:6px 0}
+small{color:var(--mute)}
+.card{background:var(--sf);border:4px solid var(--ink);border-radius:22px;padding:16px;box-shadow:0 6px 0 var(--ink)}
+.hud{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.hud div{background:var(--sf);border:3px solid var(--ink);border-radius:14px;padding:4px 6px;text-align:center;font-weight:700;font-size:.95rem}
+#cv{display:block;width:100%;height:auto;border:4px solid var(--ink);border-radius:22px;touch-action:none;background:#9fdcff}
+.lg{list-style:none;padding:0;margin:10px 0}
+.lg li{display:flex;gap:10px;align-items:center;margin:6px 0}
+.lg b{font-size:1.7rem;width:2.2rem;text-align:center}
+button{font:inherit;font-weight:700;color:#fff;background:var(--pur);border:4px solid var(--ink);border-radius:18px;padding:12px 18px;width:100%;margin-top:12px;cursor:pointer;box-shadow:0 5px 0 var(--ink);min-height:52px}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+button:focus-visible{outline:4px solid #ffd23f;outline-offset:3px}
+.st{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.st div{background:var(--okbg);border:3px solid var(--ink);border-radius:14px;padding:8px;text-align:center}
+.st div.b{background:var(--badbg)}
+.st b{display:block;font-size:1.35rem}
+.rank{font-size:1.6rem;font-weight:700;color:var(--pink);line-height:1.15}
+ul.r{padding-left:20px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<section id="scr" class="card"></section>
+<section id="play" hidden>
+<div class="hud"><div id="ht">⏱ 45</div><div id="hc">👛 RM800</div><div id="hd">🔗 RM0</div><div id="hh">❤️❤️❤️</div></div>
+<canvas id="cv" width="360" height="520" aria-label="Kawasan permainan"></canvas>
+</section>
+</main>
+<script>
+const W=360,H=520,cv=document.getElementById("cv"),cx=cv.getContext("2d"),scr=document.getElementById("scr"),pl=document.getElementById("play");
+const NEED=["🍚","📚","🚌","💡","🥚"],WANT=["👟","🎧","🎟️","👗","🧋"];
+const pick=a=>a[Math.floor(Math.random()*a.length)],rm=n=>"RM"+Math.round(n);
+let g,raf;
+function start(){scr.hidden=false;pl.hidden=true;scr.innerHTML=`<h1>Tangkap duit!</h1><p><b>Dompet lawan PayLater</b></p>
+<p>Anda ada RM800 untuk sebulan. Gerakkan dompet 👛 untuk menangkap apa yang jatuh. Bertahan selama 45 saat!</p>
+<ul class="lg"><li><b>🍚</b>Keperluan: tangkap! Terlepas akan kurangkan ❤️</li>
+<li><b>👟</b>Kehendak dengan pita “PayLater 0%”: seronok, tetapi hutang bertambah dan dompet jadi berat 🔗</li>
+<li><b>🪙</b>Duit tambahan: tangkap</li>
+<li><b>💥</b>Caj lewat: elak! Makin banyak hutang, makin kerap ia jatuh</li></ul>
+<p><small>Seret jari ke kiri dan kanan, atau guna anak panah.</small></p>
+<button data-a="go">Mula main!</button>
+<p><small>Simulasi untuk projek kesedaran CTU556. Angka dalam permainan ialah contoh.</small></p>`}
+function go(){g={t:45,cash:800,debt:0,hp:3,pts:0,need:0,res:0,x:W/2,tx:W/2,items:[],fx:[],sp:0,last:0};scr.hidden=true;pl.hidden=false;cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+function pay(a){if(g.cash>=a)g.cash-=a;else{g.debt+=a-g.cash;g.cash=0}}
+function fx(x,y,t,c){g.fx.push({x,y,t,c,l:1})}
+function spawn(){const b=g.debt>0?Math.min(.28,g.debt/700):0,r=Math.random();let k,e;
+if(r<b){k="bomb";e="💥"}else if(r<b+.14){k="coin";e="🪙"}else if(Math.random()<.5){k="need";e=pick(NEED)}else{k="want";e=pick(WANT)}
+g.items.push({k,e,x:32+Math.random()*(W-64),y:-30,v:95+Math.random()*50+(45-g.t)*2.2})}
+function loop(ts){const dt=Math.min(.05,(ts-(g.last||ts))/1000);g.last=ts;
+g.t-=dt;g.sp-=dt;if(g.sp<=0){spawn();g.sp=Math.max(.5,.8-(45-g.t)*.007)}
+const ch=Math.min(6,Math.floor(g.debt/60)),spd=620*(1-.09*ch),st=spd*dt;
+g.x+=Math.max(-st,Math.min(st,g.tx-g.x));
+const wy=H-62;
+g.items=g.items.filter(i=>{i.y+=i.v*dt;
+if(Math.abs(i.x-g.x)<46&&Math.abs(i.y-wy)<30){
+if(i.k=="need"){pay(30);g.pts+=10;g.need++;fx(i.x,i.y,"Perlu! +10","#1fa965")}
+else if(i.k=="want"){g.debt+=60;g.pts+=15;fx(i.x,i.y,"PayLater! +15, hutang RM60","#ff2d7a")}
+else if(i.k=="coin"){g.cash+=20;fx(i.x,i.y,"+RM20","#d99a00")}
+else{pay(50);fx(i.x,i.y,"Caj lewat −RM50","#e0342a")}
+return false}
+if(i.y>H+20){
+if(i.k=="need"){g.hp--;fx(i.x,H-40,"Terlepas! ❤️−1","#e0342a")}
+else if(i.k=="want"){g.pts+=3;g.res++;fx(i.x,H-40,"Tahan diri +3","#1fa965")}
+return false}
+return true});
+g.fx.forEach(f=>{f.y-=34*dt;f.l-=dt*.9});g.fx=g.fx.filter(f=>f.l>0);
+draw(ch);hud();
+if(g.t<=0||g.hp<=0){end();return}
+raf=requestAnimationFrame(loop)}
+function hud(){document.getElementById("ht").textContent="⏱ "+Math.max(0,Math.ceil(g.t));
+document.getElementById("hc").textContent="👛 "+rm(g.cash);
+const d=document.getElementById("hd");d.textContent="🔗 "+rm(g.debt);d.style.color=g.debt?"#e0342a":"";
+document.getElementById("hh").textContent="❤️".repeat(Math.max(0,g.hp))||"💔"}
+function tag(x,y,t,c){cx.font="700 11px Fredoka,sans-serif";const w=cx.measureText(t).width+12;cx.fillStyle=c;cx.beginPath();if(cx.roundRect)cx.roundRect(x-w/2,y-9,w,18,9);else cx.rect(x-w/2,y-9,w,18);cx.fill();cx.fillStyle="#fff";cx.fillText(t,x,y+1)}
+function draw(ch){
+const gr=cx.createLinearGradient(0,0,0,H);gr.addColorStop(0,"#7fd0ff");gr.addColorStop(1,"#d8f3ff");cx.fillStyle=gr;cx.fillRect(0,0,W,H);
+cx.textAlign="center";cx.textBaseline="middle";cx.globalAlpha=.8;cx.font="48px sans-serif";cx.fillText("☁️",60,70);cx.fillText("☁️",290,150);cx.fillText("☁️",170,300);cx.globalAlpha=1;
+cx.fillStyle="#7be495";cx.fillRect(0,H-26,W,26);
+g.items.forEach(i=>{
+if(i.k=="need"){cx.fillStyle="rgba(47,191,113,.35)";cx.beginPath();cx.arc(i.x,i.y,26,0,7);cx.fill()}
+if(i.k=="bomb"){cx.fillStyle="rgba(224,52,42,.3)";cx.beginPath();cx.arc(i.x,i.y,28,0,7);cx.fill()}
+cx.font="36px sans-serif";cx.fillText(i.e,i.x,i.y);
+if(i.k=="want")tag(i.x,i.y-30,"PayLater 0%","#ff4d8d");
+if(i.k=="bomb")tag(i.x,i.y-32,"Caj lewat","#e0342a")});
+const wy=H-62;cx.font="26px sans-serif";for(let k=0;k<ch;k++)cx.fillText("🔗",g.x-52+k*17,wy+30);
+cx.font=(54-ch*2)+"px sans-serif";cx.fillText("👛",g.x,wy);
+cx.font="700 15px Fredoka,sans-serif";cx.lineWidth=4;cx.strokeStyle="#fff";
+g.fx.forEach(f=>{cx.globalAlpha=Math.max(0,f.l);cx.fillStyle=f.c;const x=Math.max(70,Math.min(W-70,f.x));cx.strokeText(f.t,x,f.y);cx.fillText(f.t,x,f.y)});cx.globalAlpha=1}
+function end(){
+const next=800+g.cash-g.debt;let r,m;
+if(g.hp<=0){r="Perut kosong, dompet pun kosong";m="Terlalu banyak keperluan terlepas. Bajet bijak mesti dahulukan keperluan."}
+else if(g.debt===0){r="Dompet terkawal 🏆";m="Anda menahan diri daripada tawaran PayLater dan masih memenuhi keperluan."}
+else if(g.debt<=120){r="Seimbang 🙂";m="Hutang PayLater anda masih boleh ditanggung, tetapi elaun bulan depan sudah berkurang."}
+else if(g.debt<=300){r="Mula tersepit 😅";m="Elaun bulan depan banyak terpakai untuk ansuran. Pilihan anda makin sempit."}
+else{r="Terjerat ansuran 😵";m="Dompet anda terlalu berat dengan hutang. Di sinilah caj lewat dan hutang bertimbun bermula."}
+scr.hidden=false;pl.hidden=true;
+scr.innerHTML=`<div class="rank">${r}</div><p>${m}</p>
+<div class="st"><div><b>${g.pts}</b>Mata keseronokan</div><div><b>${g.need}</b>Keperluan dipenuhi</div><div><b>${g.res}</b>Kehendak ditahan</div><div class="b"><b>${rm(g.debt)}</b>Hutang PayLater</div></div>
+<p><b>Baki elaun bulan depan: ${rm(next)}</b><br><small>RM800 + baki tunai ${rm(g.cash)} − hutang ${rm(g.debt)}</small></p>
+<p>Mata tinggi tidak bermakna dompet selamat. Bandingkan mata anda dengan hutang anda.</p>
+<h2>Soalan renungan</h2><ul class="r">
+<li>Kawal diri: adakah saya menangkap pita PayLater kerana perlu atau kerana teruja?</li>
+<li>Tanggungjawab: siapa menanggung kesan jika saya tidak mampu membayar?</li>
+<li>Keadilan: wajarkah skim kredit dipasarkan kepada pelajar yang pendapatannya terhad?</li></ul>
+<p><small>Pada Oktober 2024, Kementerian Kewangan memaklumkan bahawa AKPK mendapati 53,000 individu bawah 30 tahun menanggung hutang terkumpul hampir RM1.9 bilion.</small></p>
+<button data-a="go">Main semula</button>`}
+function mv(e){const r=cv.getBoundingClientRect();if(g)g.tx=Math.max(28,Math.min(W-28,(e.clientX-r.left)/r.width*W))}
+cv.addEventListener("pointerdown",mv);cv.addEventListener("pointermove",mv);
+addEventListener("keydown",e=>{if(!g)return;if(e.key=="ArrowLeft")g.tx=Math.max(28,g.tx-70);if(e.key=="ArrowRight")g.tx=Math.min(W-28,g.tx+70)});
+scr.addEventListener("click",e=>{if(e.target.closest("button"))go()});
+start();
+</script>
+</body>
+</html>
